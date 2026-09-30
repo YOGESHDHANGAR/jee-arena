@@ -60,7 +60,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; }
+html, body { margin: 0; } html { scrollbar-gutter: stable; } /* no sideways jump when a page gains/loses its scrollbar */
 body {
   background: var(--bg);
   color: var(--text);
