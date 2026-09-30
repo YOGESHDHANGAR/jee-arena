@@ -34,7 +34,7 @@ export default function Home() {
           <Link to="/problems" className="btn primary lg">{t('Start solving')} <Icon.ArrowRight /></Link>
           {!user && <Link to="/register" className="btn lg"><Icon.UserPlus /> {t('Create free account')}</Link>}
           {user && <Link to="/practice" className="btn lg"><Icon.Target /> {t('Build a custom test')}</Link>}
-          {user && <Link to={`/u/${user.username}?tab=analysis`} className="btn lg ghost"><Icon.ChartColumn /> {t('My analysis')}</Link>}
+          {user && <Link to="/progress?tab=analysis" className="btn lg ghost"><Icon.ChartColumn /> {t('My analysis')}</Link>}
         </div>
       </section>
       )}
@@ -166,7 +166,7 @@ function Dashboard({ user }) {
             <span className="muted small">{t('{p}% right on the first try. Start with easy ones.', { p: d.weakest.accuracy })}</span>
           </Link>
         ) : (
-          <Link to={`/u/${user.username}?tab=analysis`} className="dash-card">
+          <Link to="/progress?tab=analysis" className="dash-card">
             <span className="dash-ic"><Icon.ChartColumn /></span>
             <span className="dash-k">{t('My analysis')}</span>
             <b>{t('Strong and weak chapters')}</b>

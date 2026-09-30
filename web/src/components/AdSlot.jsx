@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
@@ -8,8 +8,25 @@ import { useAuth } from '../lib/auth.jsx';
  *   - Big screens (≥ 1280px wide and ≥ 720px tall): one sticky 160×600 ad in the empty space on each side.
  *   - Everything else (phones, short laptop screens): a single ad at the very bottom of the page, above the footer.
  * Nothing ever sits between questions, options, solutions or comments, and the exam screen has no ads.
- * Pro members see no ads.
+ * Pro members and admins see no ads (admins clicking their own ads can get the AdSense account banned).
+ * Pages with no study content of their own (login, sign-up, admin, "page not found") never show ads either —
+ * AdSense policy forbids ads on them.
  */
+
+const NO_AD_PATHS = /^\/(login|register|admin)(\/|$)/;
+
+// Pages that aren't matched by path (e.g. "Page not found") render <NoAds /> to switch ads off while shown.
+let noAdsCount = 0;
+const listeners = new Set();
+const subscribe = (fn) => (listeners.add(fn), () => listeners.delete(fn));
+const setNoAds = (d) => ((noAdsCount += d), listeners.forEach((fn) => fn()));
+export function NoAds() {
+  useEffect(() => {
+    setNoAds(1);
+    return () => setNoAds(-1);
+  }, []);
+  return null;
+}
 
 let configPromise;
 const getConfig = () => (configPromise ||= api('/config').catch(() => ({ ads: null })));
@@ -29,9 +46,11 @@ function loadAdSense(client) {
   return scriptPromise;
 }
 
-/** { ads, on } — `on` is false when ads aren't configured or the viewer is Pro. */
+/** { ads, on } — `on` is false when ads aren't configured, the viewer is Pro/admin, or the page has no ads. */
 export function useAds() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const blocked = useSyncExternalStore(subscribe, () => noAdsCount > 0) || NO_AD_PATHS.test(pathname);
   const [ads, setAds] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -40,7 +59,7 @@ export function useAds() {
       alive = false;
     };
   }, []);
-  const on = !!ads && user?.plan !== 'pro' && (ads.preview || !!ads.client);
+  const on = !!ads && !blocked && user?.plan !== 'pro' && user?.role !== 'admin' && (ads.preview || !!ads.client);
   return { ads, on };
 }
 

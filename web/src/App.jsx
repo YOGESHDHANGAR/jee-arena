@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout.jsx';
+import { NoAds } from './components/AdSlot.jsx';
 import { useAuth } from './lib/auth.jsx';
 import Home from './pages/Home.jsx';
 import Problems from './pages/Problems.jsx';
@@ -11,7 +12,7 @@ import TestLobby from './pages/TestLobby.jsx';
 import TestRunner from './pages/TestRunner.jsx';
 import TestResult from './pages/TestResult.jsx';
 import Practice from './pages/Practice.jsx';
-import Leaderboard from './pages/Leaderboard.jsx';
+import Progress from './pages/Progress.jsx';
 import Profile from './pages/Profile.jsx';
 import Pro from './pages/Pro.jsx';
 import Privacy from './pages/Privacy.jsx';
@@ -42,7 +43,8 @@ export default function App() {
         <Route path="/practice" element={<RequireAuth><Practice /></RequireAuth>} />
         <Route path="/test/:id" element={<TestLobby />} />
         <Route path="/test/:id/result" element={<RequireAuth><TestResult /></RequireAuth>} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/progress" element={<Progress />} />
+        <Route path="/leaderboard" element={<Progress />} />
         <Route path="/u/:username" element={<Profile />} />
         <Route path="/pro" element={<Pro />} />
         <Route path="/privacy" element={<Privacy />} />
@@ -53,7 +55,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Login register />} />
         <Route path="/admin/*" element={<RequireAuth><Suspense fallback={<div className="spinner" />}><Admin /></Suspense></RequireAuth>} />
-        <Route path="*" element={<div className="empty"><h2>Page not found</h2></div>} />
+        <Route path="*" element={<div className="empty"><NoAds /><h2>Page not found</h2></div>} />
       </Route>
     </Routes>
   );

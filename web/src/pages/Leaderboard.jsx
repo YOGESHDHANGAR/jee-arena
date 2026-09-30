@@ -6,8 +6,9 @@ import { useAuth } from '../lib/auth.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { useT } from '../lib/i18n.jsx';
 
-export default function Leaderboard() {
-  useTitle('Rankings', 'All-India JEE Arena rankings by contest rating and questions solved.');
+/** embedded: shown as the "All-India ranks" tab of the Progress page (pages/Progress.jsx), which sets the title. */
+export default function Leaderboard({ embedded = false }) {
+  useTitle(embedded ? undefined : 'Rankings', 'All-India JEE Arena rankings by contest rating and questions solved.');
   const [by, setBy] = useState('week');
   const [page, setPage] = useState(1);
   const { data, error, loading } = useApi(by === 'week' ? '/leaderboard/week' : '/leaderboard', { query: by === 'week' ? { page } : { by, page } });
@@ -15,11 +16,12 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const t = useT();
   const pages = data ? Math.max(1, Math.ceil(data.total / 50)) : 1;
+  const Wrap = embedded ? 'div' : 'main';
 
   return (
-    <main className="page narrow">
+    <Wrap className={embedded ? 'narrow-block' : 'page narrow'}>
       <div className="spread">
-        <h1 style={{ margin: 0 }}>{t('All-India ranks')}</h1>
+        {embedded ? <span /> : <h1 style={{ margin: 0 }}>{t('All-India ranks')}</h1>}
         {data?.me && <span className="pill pro">{t('Your rank:')} #{data.me.rank.toLocaleString('en-IN')}{by === 'week' ? ` · ${t('{n} solved', { n: data.me.solvedThisWeek })}` : ''}</span>}
       </div>
       <div className="tabs" style={{ marginTop: 16 }}>
@@ -98,6 +100,6 @@ export default function Leaderboard() {
           <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>{t('Next')} <Icon.ChevronRight /></button>
         </div>
       )}
-    </main>
+    </Wrap>
   );
 }

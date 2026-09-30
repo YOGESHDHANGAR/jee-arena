@@ -3,10 +3,11 @@
 //   node scripts/copy-db.js --to="mongodb+srv://..."            (refuses if target collections have data)
 //   node scripts/copy-db.js --to="mongodb+srv://..." --replace  (empties each target collection first)
 import { MongoClient } from 'mongodb';
+import { mongoUri } from '../server/src/lib/mongoUri.js';
 
 const arg = (k) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3);
 const has = (k) => process.argv.includes(`--${k}`);
-const fromUri = arg('from') || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
+const fromUri = arg('from') || mongoUri();
 const toUri = arg('to');
 const dbName = arg('db') || process.env.DB_NAME || 'jee_arena';
 if (!toUri) { console.error('Pass --to="<target mongodb uri>"'); process.exit(1); }

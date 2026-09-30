@@ -7,12 +7,13 @@
  *   npm run restore -- <file> --to=jee_arena --replace
  *       -> replaces the live database's collections with the backup (asks you to type the name)
  *
- * Uses MONGO_URI from .env (point it at Atlas to restore there).
+ * Restores into your local MongoDB. To restore into Atlas: USE_ATLAS=1 npm run restore (uses ATLAS_URI).
  */
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import readline from 'node:readline';
 import { MongoClient, BSON } from 'mongodb';
+import { mongoUri } from '../server/src/lib/mongoUri.js';
 
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--'));
@@ -23,7 +24,7 @@ if (!file || !fs.existsSync(file)) {
   console.error('Usage: npm run restore -- <backup.jsonl.gz> [--to=<database>] [--replace]');
   process.exit(1);
 }
-const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
+const uri = mongoUri(); // local unless USE_ATLAS=1
 const live = process.env.DB_NAME || 'jee_arena';
 const target = val('to') || `${live}_restore`;
 

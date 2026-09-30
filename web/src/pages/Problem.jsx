@@ -8,7 +8,9 @@ import { AnswerInput, hasAnswer } from '../components/AnswerInput.jsx';
 import { ProblemListDrawer } from '../components/ProblemListDrawer.jsx';
 import { Discussion } from '../components/Discussion.jsx';
 import { ErrorBox, Pill, Spinner } from '../components/Layout.jsx';
+import { NoAds } from '../components/AdSlot.jsx';
 import { ReportButton } from '../components/ReportButton.jsx';
+import { ReasonPicker } from '../components/ReasonPicker.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { useT } from '../lib/i18n.jsx';
 
@@ -34,6 +36,10 @@ export default function Problem() {
 
   const solved = data?.progress?.status === 'solved' || result?.correct;
   const done = solved || !!revealed;
+  // A mistake the student can tag with why (My journey → Why you lose marks): a wrong answer, giving up,
+  // or reopening a question that wasn't right first time.
+  const pr = data?.progress;
+  const missed = !!user && ((result && !result.correct) || (!!revealed && !solved) || (!result && !!pr && (pr.status !== 'solved' || pr.attempts > 1)));
   const [elapsed, readElapsed] = useVisibleSeconds(qid, !!data && !done);
 
   useEffect(() => {
@@ -141,6 +147,7 @@ export default function Problem() {
         <Locked q={data.question} toQ={toQ} next={n?.nextQid} />
       ) : error ? (
         <div className="stack">
+          {error.status === 404 && <NoAds />}
           <ErrorBox error={error} />
           {error.status === 403 && <p><Link to="/pro" className="btn primary">{t('See Pro')}</Link></p>}
         </div>
@@ -196,6 +203,11 @@ export default function Problem() {
                   {result.correct
                     ? `${t('Correct! Solved in {time}', { time: fmtShort(result.solveTimeSec ?? myTime) })}${q.stats.avgSolveSec ? ` (${t('average {time}', { time: fmtShort(q.stats.avgSolveSec) })})` : ''}.`
                     : t('Not quite. Try again, or view the solution.')}
+                </div>
+              )}
+              {missed && (
+                <div style={{ marginTop: 12 }}>
+                  <ReasonPicker key={qid} path={`/problems/${qid}/reason`} value={pr?.reason} />
                 </div>
               )}
               <div style={{ marginTop: 12 }}><ErrorBox error={err} /></div>

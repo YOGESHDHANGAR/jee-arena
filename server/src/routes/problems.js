@@ -11,6 +11,8 @@ import { applySearch, textOrScan, ttlCache } from '../lib/search.js';
 import { resolveChapter, subjectUnits } from '../lib/chapters.js';
 import { CHEM_BRANCHES } from '../lib/branches.js';
 import { dueQids, recordMistake, recordSuccess } from '../lib/reviews.js';
+import { cleanReason } from '../lib/signals.js';
+import { forgetInsights } from '../lib/insights.js';
 import { syllabusChapters } from '../lib/syllabus.js';
 import {
   ah, bad, forbidden, notFound, int, publicQuestion, reveal, practiceFilter, previewOf,
@@ -265,7 +267,7 @@ problemsRouter.get(
       bookmarked,
       isPotd: potd?.qid === q.qid,
       progress: mine
-        ? { status: mine.status, attempts: mine.attempts, lastAnswer: mine.lastAnswer ?? null, timeSpentSec: mine.timeSpentSec || 0, solveTimeSec: mine.solveTimeSec ?? null }
+        ? { status: mine.status, attempts: mine.attempts, lastAnswer: mine.lastAnswer ?? null, timeSpentSec: mine.timeSpentSec || 0, solveTimeSec: mine.solveTimeSec ?? null, reason: mine.reason || null }
         : null,
       // Solution stays hidden until the student solves it or chooses to reveal it.
       revealed: mine && (mine.status === 'solved' || mine.revealed) ? reveal(q) : null,
@@ -329,6 +331,26 @@ problemsRouter.post(
     await Promise.all(jobs);
 
     res.json({ correct, solveTimeSec, revealed: correct ? reveal(q) : null });
+  }),
+);
+
+/**
+ * "Why did I lose this mark?" after a wrong answer or giving up (lib/signals.js). Only for questions
+ * the student didn't get right first time. reason: null clears it.
+ */
+problemsRouter.post(
+  '/:qid/reason',
+  requireUser,
+  ah(async (req, res) => {
+    const qid = int(req.params.qid, 0);
+    const userId = new ObjectId(req.user.id);
+    const p = await col('progress').findOne({ userId, qid }, { projection: { attempts: 1, status: 1, revealed: 1 } });
+    if (!p) throw bad('Try the question first');
+    if (p.status === 'solved' && p.attempts === 1 && !p.revealed) throw bad('You got this one right first time');
+    const reason = cleanReason(req.body.reason);
+    await col('progress').updateOne({ _id: p._id }, reason ? { $set: { reason, reasonAt: new Date() } } : { $unset: { reason: '', reasonAt: '' } });
+    forgetInsights(req.user.id);
+    res.json({ qid, reason });
   }),
 );
 

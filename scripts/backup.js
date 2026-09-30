@@ -17,13 +17,14 @@ import zlib from 'node:zlib';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { MongoClient, BSON } from 'mongodb';
+import { mongoUri } from '../server/src/lib/mongoUri.js';
 import { request as r2Put, settings as r2Settings } from './upload-media.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (name) => process.argv.slice(2).find((a) => a === `--${name}` || a.startsWith(`--${name}=`));
 const val = (name) => arg(name)?.split('=').slice(1).join('=');
 
-const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
+const uri = mongoUri(); // local unless USE_ATLAS=1
 const dbName = process.env.DB_NAME || 'jee_arena';
 const outDir = path.resolve(val('out') || path.join(ROOT, 'backups'));
 const keep = Number(val('keep')) || 0;

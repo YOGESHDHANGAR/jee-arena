@@ -197,6 +197,14 @@ async function metaFor(req) {
 }
 
 /** Express handler: the SPA's index.html with page-specific meta tags. */
+/**
+ * AdSense site verification: Google looks for this tag in the page HTML itself (it doesn't run the app's
+ * JavaScript), so it goes into every page. It only links the site to the account — it never shows an ad.
+ */
+export function adsenseMeta(client) {
+  return /^ca-pub-\d{10,20}$/.test(client || '') ? `<meta name="google-adsense-account" content="${client}" />` : '';
+}
+
 export function serveIndex(indexFile) {
   return async (req, res, next) => {
     try {
@@ -211,7 +219,7 @@ export function serveIndex(indexFile) {
       // Tells the web app where question pictures live (see MEDIA_BASE_URL).
       if (meta.redirect) return res.redirect(301, meta.redirect);
       const boot = `<script>window.__JA__=${JSON.stringify({ mediaBase: config.mediaBaseUrl || '/media' }).replace(/</g, '\\u003c')}</script>`;
-      res.status(meta.status || 200).set('Cache-Control', 'no-cache').type('html').send(injectMeta(html, meta, `${boot}${meta.head || ''}`));
+      res.status(meta.status || 200).set('Cache-Control', 'no-cache').type('html').send(injectMeta(html, meta, `${boot}${adsenseMeta(config.ads.client)}${meta.head || ''}`));
     } catch (e) {
       next(e);
     }

@@ -66,6 +66,9 @@ export async function gradeAttempt(t, attempt, submittedAt = new Date()) {
   // Time per question (tracked by the test screen; older attempts don't have it).
   const times = attempt.times || {};
   for (const p of g.perQuestion) if (times[p.qid] !== undefined) p.timeSec = times[p.qid];
+  // How sure the student said they were (lib/signals.js), for the "should I guess?" insight.
+  const conf = attempt.confidence || {};
+  for (const p of g.perQuestion) if (conf[p.qid]) p.conf = conf[p.qid];
   const update = {
     submittedAt: end,
     timeTakenSec: Math.max(0, Math.round((end - attempt.startedAt) / 1000)),

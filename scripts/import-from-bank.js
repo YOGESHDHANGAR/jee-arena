@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { MongoClient } from 'mongodb';
+import { mongoUri } from '../server/src/lib/mongoUri.js';
 import { mapStudioRow } from './lib/studio-bank.js';
 import { fingerprint } from '../server/src/lib/fingerprint.js';
 import { chapterIdFields } from '../server/src/lib/chapterIds.js';
@@ -35,7 +36,7 @@ const STUDIO = path.resolve(ROOT, process.env.STUDIO_PATH || '../jee-video-studi
 const BANK = path.join(STUDIO, 'bank', 'jee-bank.db');
 const STUDIO_IMAGES = path.join(STUDIO, 'public', 'images');
 const MEDIA = path.join(ROOT, 'media');
-const DST_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
+const DST_URI = mongoUri(); // local unless USE_ATLAS=1
 const DST_DB = process.env.DB_NAME || 'jee_arena';
 const dryRun = !!args['dry-run'];
 const limit = args.limit ? Number(args.limit) : Infinity;

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApi, SUBJECT_LABEL, TYPE_LABEL, useTitle } from '../lib/hooks.js';
 import { ErrorBox, Pill, Spinner } from '../components/Layout.jsx';
+import { NoAds } from '../components/AdSlot.jsx';
 import { Rich } from '../components/Rich.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { useT } from '../lib/i18n.jsx';
@@ -31,6 +32,7 @@ export default function Chapter({ subject }) {
   if (error) {
     return (
       <main className="page narrow">
+        <NoAds />
         <ErrorBox error={error} />
         <p><Link className="btn" to={`/${subject}`}>{t('All {subject} chapters', { subject: label })}</Link></p>
       </main>

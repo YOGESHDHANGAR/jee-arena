@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import { AdRails, AdBottom } from './AdSlot.jsx';
 import { InstallButton } from './InstallButton.jsx';
@@ -9,6 +9,7 @@ import { LangToggle, useT } from '../lib/i18n.jsx';
 export function Layout() {
   const { user } = useAuth();
   const t = useT();
+  const location = useLocation(); // /leaderboard is the Progress page's ranks tab
   return (
     <>
       <header className="nav">
@@ -22,7 +23,7 @@ export function Layout() {
             <NavLink to="/contests"><Icon.Trophy /> <span>{t('Contests')}</span></NavLink>
             <NavLink to="/mocks"><Icon.ClipboardList /> <span>{t('Mock tests')}</span></NavLink>
             <NavLink to="/practice"><Icon.Target /> <span>{t('Practice')}</span></NavLink>
-            <NavLink to="/leaderboard"><Icon.ChartNoAxesColumn /> <span>{t('Ranks')}</span></NavLink>
+            <NavLink to="/progress" className={({ isActive }) => (isActive || location.pathname === '/leaderboard' ? 'active' : '')}><Icon.ChartNoAxesColumn /> <span>{t('Progress')}</span></NavLink>
           </nav>
           <div className="nav-right">
             {user ? (
@@ -53,7 +54,7 @@ export function Layout() {
         <NavLink to="/practice"><Icon.Target /><span>{t('Practice')}</span></NavLink>
         <NavLink to="/contests"><Icon.Trophy /><span>{t('Contests')}</span></NavLink>
         <NavLink to="/mocks"><Icon.ClipboardList /><span>{t('Mocks')}</span></NavLink>
-        <NavLink to="/leaderboard"><Icon.ChartNoAxesColumn /><span>{t('Ranks')}</span></NavLink>
+        <NavLink to="/progress" className={({ isActive }) => (isActive || location.pathname === '/leaderboard' ? 'active' : '')}><Icon.ChartNoAxesColumn /><span>{t('Progress')}</span></NavLink>
       </nav>
       <footer className="footer">
         <div className="footer-inner">

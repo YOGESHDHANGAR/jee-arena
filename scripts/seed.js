@@ -4,8 +4,9 @@
  * Safe to re-run (matches on source "sample").
  */
 import { MongoClient } from 'mongodb';
+import { mongoUri } from '../server/src/lib/mongoUri.js';
 
-const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
+const uri = mongoUri(); // local unless USE_ATLAS=1
 const dbName = process.env.DB_NAME || 'jee_arena';
 
 const S = (subject, chapter, difficulty, type, text, options, answer, solution, pyq) => ({

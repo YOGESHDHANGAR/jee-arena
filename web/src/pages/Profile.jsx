@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { lazy, Suspense, useMemo } from 'react';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { Analysis } from '../components/Analysis.jsx';
+// My journey is loaded only when opened (it also brings the college data).
+const Insights = lazy(() => import('../components/Insights.jsx').then((m) => ({ default: m.Insights })));
 import { Icon } from '../components/Icon.jsx';
 import { useApi, SUBJECT_LABEL, fmtDate, useTitle } from '../lib/hooks.js';
 import { useAuth } from '../lib/auth.jsx';
@@ -22,7 +24,9 @@ export default function Profile() {
   if (error) return <main className="page narrow"><ErrorBox error={error} /></main>;
   const { user: u, totals, ratingHistory, activity, chapterStats, weak } = data;
   const isMe = me?.username === u.username;
-  const canAnalyse = isMe || me?.role === 'admin';
+  // Your own analysis and journey live on the Progress page; admins can still open another student's here.
+  const canAnalyse = !isMe && me?.role === 'admin';
+  if (isMe && (tab === 'analysis' || tab === 'journey')) return <Navigate to={`/progress?tab=${tab}`} replace />;
 
   return (
     <main className="page">
@@ -36,6 +40,7 @@ export default function Profile() {
         </div>
         {isMe && (
           <div className="row">
+            <Link className="btn primary" to="/progress"><Icon.ChartColumn /> {t('My progress')}</Link>
             <Link className="btn" to="/problems?status=bookmarked"><Icon.Bookmark /> {t('Bookmarks')}</Link>
             <Link className="btn" to="/problems?status=attempted"><Icon.CircleX /> {t('My mistakes')}</Link>
             <Link className="btn" to="/practice"><Icon.Target /> {t('Take a custom test')}</Link>
@@ -45,11 +50,14 @@ export default function Profile() {
 
       {canAnalyse && (
         <div className="tabs" style={{ marginBottom: 16 }}>
-          <button className={`tab ${tab !== 'analysis' ? 'on' : ''}`} onClick={() => setParams({})}><Icon.User /> {t('Overview')}</button>
+          <button className={`tab ${tab !== 'analysis' && tab !== 'journey' ? 'on' : ''}`} onClick={() => setParams({})}><Icon.User /> {t('Overview')}</button>
           <button className={`tab ${tab === 'analysis' ? 'on' : ''}`} onClick={() => setParams({ tab: 'analysis' })}><Icon.ChartColumn /> {t('My analysis')}</button>
+          <button className={`tab ${tab === 'journey' ? 'on' : ''}`} onClick={() => setParams({ tab: 'journey' })}><Icon.Route /> {t('My journey')}</button>
         </div>
       )}
-      {canAnalyse && tab === 'analysis' ? (
+      {canAnalyse && tab === 'journey' ? (
+        <Suspense fallback={<Spinner />}><Insights username={u.username} /></Suspense>
+      ) : canAnalyse && tab === 'analysis' ? (
         <Analysis username={u.username} />
       ) : (
       <>

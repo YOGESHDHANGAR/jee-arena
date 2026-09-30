@@ -10,6 +10,8 @@ import { recordActivity } from '../lib/activity.js';
 import { hasPro } from '../lib/premium.js';
 import { buildPractice, mistakeCount, resolveChapterFor, syllabusOverview, weakPreview } from '../lib/builder.js';
 import { dueCount } from '../lib/reviews.js';
+import { cleanConfidence, cleanReason, cleanVisits } from '../lib/signals.js';
+import { forgetInsights, testReplay } from '../lib/insights.js';
 
 export const testsRouter = Router();
 
@@ -186,6 +188,8 @@ testsRouter.post(
       answers: attempt.answers || {},
       marked: attempt.marked || [],
       times: attempt.times || {},
+      confidence: attempt.confidence || {},
+      visits: attempt.visits || [],
       questions: paper.map(publicQuestion),
     });
   }),
@@ -207,6 +211,8 @@ testsRouter.put(
     const marked = (req.body.marked || []).map(Number).filter((n) => allowed.has(String(n)));
     const set = { answers, marked, savedAt: new Date() };
     if (req.body.times) set.times = cleanTimes(t, req.body.times, attempt.times);
+    if (req.body.confidence) set.confidence = cleanConfidence(t, req.body.confidence);
+    if (req.body.visits) set.visits = cleanVisits(t, req.body.visits);
     await col('testAttempts').updateOne({ _id: attempt._id, submittedAt: { $exists: false } }, { $set: set });
     res.json({ ok: true, savedAt: new Date() });
   }),
@@ -228,6 +234,8 @@ testsRouter.post(
         attempt.answers = answers;
         const set = { answers };
         if (req.body.times) set.times = attempt.times = cleanTimes(t, req.body.times, attempt.times);
+        if (req.body.confidence) set.confidence = attempt.confidence = cleanConfidence(t, req.body.confidence);
+        if (req.body.visits) set.visits = attempt.visits = cleanVisits(t, req.body.visits);
         await col('testAttempts').updateOne({ _id: attempt._id }, { $set: set });
       }
       attempt = await gradeAttempt(t, attempt, new Date());
@@ -276,7 +284,29 @@ testsRouter.get(
       rating: attempt.ratingAfter !== undefined ? { before: attempt.ratingBefore, after: attempt.ratingAfter, delta: attempt.ratingDelta } : null,
       questions: paper.map((q) => ({ ...publicQuestion(q), ...reveal(q), result: pq.get(q.qid) || null, others: others?.get(q.qid) || null })),
       inRevision,
+      // Why each mark was lost, as tagged by the student, and how they moved through the paper.
+      reasons: attempt.reasons || {},
+      replay: testReplay(attempt, paper, t),
     });
+  }),
+);
+
+/** "Why did I lose this mark?" on a wrong or skipped test question (lib/signals.js). reason: null clears it. */
+testsRouter.post(
+  '/:id/reasons',
+  requireUser,
+  ah(async (req, res) => {
+    const t = await getTest(req.params.id, req.user.id);
+    const qid = Number(req.body.qid);
+    if (!t.questionIds.includes(qid)) throw bad('That question is not in this test');
+    const attempt = await col('testAttempts').findOne({ testId: t._id, userId: new ObjectId(req.user.id) }, { projection: { submittedAt: 1, perQuestion: 1 } });
+    if (!attempt?.submittedAt) throw bad('Submit the test first');
+    const p = (attempt.perQuestion || []).find((x) => x.qid === qid);
+    if (!p || p.status === 'correct') throw bad('Only wrong or skipped questions can be tagged');
+    const reason = cleanReason(req.body.reason);
+    await col('testAttempts').updateOne({ _id: attempt._id }, reason ? { $set: { [`reasons.${qid}`]: reason } } : { $unset: { [`reasons.${qid}`]: '' } });
+    forgetInsights(req.user.id);
+    res.json({ qid, reason });
   }),
 );
 

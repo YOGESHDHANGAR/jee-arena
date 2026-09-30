@@ -20,6 +20,10 @@ export const publicUser = (u) => ({
   contestsPlayed: u.contestsPlayed || 0,
   solvedCount: u.solvedCount || 0,
   targetYear: u.targetYear || null,
+  // For Insights (lib/insights.js): exam date for the syllabus pace, and home state / female seats for the college predictor.
+  examDate: u.examDate || null,
+  homeState: u.homeState || null,
+  femaleSeats: !!u.femaleSeats,
 });
 
 /** Attaches req.user ({ id, role }) when a valid token is sent; never fails. */

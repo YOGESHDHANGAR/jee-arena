@@ -89,6 +89,8 @@ async function ensureIndexes(d) {
     d.collection('questions').createIndex({ fp: 1 }, { sparse: true }),
     d.collection('questions').createIndex({ fpText: 1 }, { sparse: true }),
     d.collection('dupIgnored').createIndex({ mode: 1, key: 1 }, { unique: true }),
+    // My journey (lib/insights.js): weekly predicted-score snapshots per student.
+    d.collection('predictions').createIndex({ userId: 1, week: -1 }),
   ]);
   // Error log (lib/errors.js): forget errors not seen for 30 days. Optional: some Mongo-compatible
   // databases have no TTL indexes (the log is capped at 2,000 groups anyway).

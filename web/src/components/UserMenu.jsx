@@ -82,7 +82,7 @@ export function UserMenu() {
 
           <div className="menu-group">
             <Link role="menuitem" to={`/u/${user.username}`} className="menu-item"><Icon.User /> {t('View profile')}</Link>
-            <Link role="menuitem" to={`/u/${user.username}?tab=analysis`} className="menu-item"><Icon.ChartColumn /> {t('My analysis')}</Link>
+            <Link role="menuitem" to="/progress?tab=analysis" className="menu-item"><Icon.ChartColumn /> {t('My analysis')}</Link>
             <Link role="menuitem" to="/problems?status=bookmarked" className="menu-item"><Icon.Bookmark /> {t('Bookmarks')}</Link>
             <Link role="menuitem" to="/problems?status=due" className="menu-item"><Icon.CalendarDays /> {t('Due for revision')}{due > 0 && <span className="menu-badge">{due}</span>}</Link>
             <Link role="menuitem" to="/problems?status=attempted" className="menu-item"><Icon.CircleX /> {t('My mistakes')}</Link>

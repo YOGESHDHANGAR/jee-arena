@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApi, useNow, fmtCountdown, fmtDate, fmtDuration, useTitle } from '../lib/hooks.js';
 import { useAuth } from '../lib/auth.jsx';
 import { ErrorBox, Pill, Spinner } from '../components/Layout.jsx';
+import { NoAds } from '../components/AdSlot.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { useT } from '../lib/i18n.jsx';
 
@@ -33,7 +34,7 @@ export default function TestLobby() {
   }, [t, reload]);
 
   if (loading && !t) return <Spinner />;
-  if (error) return <main className="page narrow"><ErrorBox error={error} /></main>;
+  if (error) return <main className="page narrow"><NoAds /><ErrorBox error={error} /></main>;
 
   const startsIn = t.startAt ? new Date(t.startAt) - now : 0;
   const canStart = t.state !== 'upcoming' && t.state !== 'ended' && !t.mine?.submitted;

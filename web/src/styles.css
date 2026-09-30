@@ -104,6 +104,13 @@ p { margin: 0 0 0.7em; }
   .nav-inner { gap: 10px; }
   .hide-sm { display: none !important; }
 }
+@media (min-width: 721px) {
+  .show-sm { display: none !important; }
+}
+@media (max-width: 420px) {
+  .progress-tabs .tab { padding: 7px 9px; }
+  .progress-tabs .tab svg { display: none; }
+}
 
 /* ---------- components ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
@@ -932,3 +939,34 @@ h3.with-icon > .icon { color: var(--accent); }
   .auth-side { display: none; }
 }
 .empty-rich .btn:not(.primary) { color: var(--text); }
+
+/* ---- My journey (components/Insights.jsx), reason tags, confidence, test replay, college predictor ---- */
+.chip.sm { padding: 3px 10px; font-size: 0.8rem; }
+.input.sm { padding: 4px 8px; font-size: 0.85rem; width: auto; }
+.good-text { color: var(--good); }
+.bad-text { color: var(--bad); }
+.sure-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.reason-picker { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.reason-picker.compact { padding: 8px 10px; }
+.insights .big-score { font-size: 2.4rem; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.insights .big-score .muted { font-size: 1rem; }
+.insights .trend { text-align: right; }
+.stackbar { display: flex; height: 12px; border-radius: 99px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+.stackbar > i { display: block; height: 100%; }
+.effort-bars { display: grid; gap: 3px; }
+.effort-bars .bar { height: 7px; }
+.effort-bars .bar.marks > i { background: var(--text); }
+.replay-strip-wrap { margin-top: 4px; }
+.replay-strip { display: block; width: 100%; height: 36px; border-radius: 6px; background: var(--surface-2); }
+.quarters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.quarter { display: grid; gap: 3px; }
+.college-filters { flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.college-filters select { font: inherit; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.college-list { gap: 10px; }
+.college-row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+@media (max-width: 640px) {
+  .insights .big-score { font-size: 2rem; }
+  .quarters { grid-template-columns: repeat(2, 1fr); }
+}
+.pill-btn { border: 1px solid transparent; cursor: pointer; font: inherit; font-size: 0.74rem; font-weight: 600; }
+.pill-btn.on { border-color: currentColor; }

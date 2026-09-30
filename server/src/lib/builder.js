@@ -48,11 +48,11 @@ export function allocate(total, available) {
  */
 export async function buildPractice(body, { pro, userId }) {
   const extra = pro ? {} : { premium: { $ne: true } }; // free students never get Pro questions in a paper
-  const mode = ['jee-main', 'mistakes', 'weak', 'due'].includes(body.mode) ? body.mode : 'custom';
+  const mode = ['jee-main', 'mistakes', 'weak', 'due', 'retention'].includes(body.mode) ? body.mode : 'custom';
   const difficulty = DIFFICULTIES.includes(body.difficulty) ? body.difficulty : undefined;
   const classLevel = [11, 12].includes(Number(body.classLevel)) ? Number(body.classLevel) : null;
   let subjects = (body.subjects || []).filter((s) => SUBJECTS.includes(s));
-  if (mode === 'jee-main' || (!subjects.length && ['mistakes', 'weak', 'due'].includes(mode))) subjects = [...SUBJECTS];
+  if (mode === 'jee-main' || (!subjects.length && ['mistakes', 'weak', 'due', 'retention'].includes(mode))) subjects = [...SUBJECTS];
 
   // Fix my weak spots (Pro): the chapters the analysis marks weak / careless / improving / slow,
   // new questions only (nothing already solved), split evenly across them.
@@ -70,6 +70,21 @@ export async function buildPractice(body, { pro, userId }) {
     }
     if (!qids.length) throw bad('You have solved every question in your weak chapters. Impressive!');
     return { questionIds: qids, title: `Weak spots: ${weak.slice(0, 2).map((c) => c.chapter).join(', ')}${weak.length > 2 ? ` +${weak.length - 2}` : ''}`, durationMin: Math.ceil(qids.length * 2.4) };
+  }
+
+  // Retention check (lib/insights.js): questions solved in practice 2 weeks to 3 months ago, to see
+  // what has stuck. Optionally one chapter ({ subject, chapter }).
+  if (mode === 'retention') {
+    const count = Math.max(5, Math.min(60, Number(body.count) || 20));
+    const now = Date.now();
+    const rows = await col('progress')
+      .find({ userId: new ObjectId(userId), status: 'solved', solvedAt: { $lte: new Date(now - 14 * 864e5), $gte: new Date(now - 90 * 864e5) } }, { projection: { qid: 1 } })
+      .toArray();
+    const match = { ...practiceFilter(), ...extra, subject: { $in: subjects }, qid: { $in: rows.map((r) => r.qid) } };
+    if (body.chapter && subjects.length === 1) match.chapterId = String(body.chapter);
+    const qids = await sampleQids(col('questions'), match, count);
+    if (qids.length < 5) throw bad('Solve more questions first: this checks questions you solved 2 weeks to 3 months ago.');
+    return { questionIds: qids, title: 'Retention check', durationMin: Math.ceil(qids.length * 2.4) };
   }
 
   // Due for revision (lib/reviews.js): mistakes whose 1/3/7-day revision date has come.

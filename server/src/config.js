@@ -1,3 +1,5 @@
+import { mongoUri } from './lib/mongoUri.js';
+
 const required = (name, fallback) => {
   const v = process.env[name] ?? fallback;
   if (v === undefined) throw new Error(`Missing env var ${name}`);
@@ -6,7 +8,8 @@ const required = (name, fallback) => {
 
 export const config = {
   port: Number(process.env.PORT || 4000),
-  mongoUri: required('MONGO_URI', 'mongodb://127.0.0.1:27017'),
+  // Local MongoDB in development, MONGO_URI in production (lib/mongoUri.js).
+  mongoUri: mongoUri(),
   dbName: required('DB_NAME', 'jee_arena'),
   jwtSecret: required('JWT_SECRET', 'dev-secret-change-me'),
   adminEmails: (process.env.ADMIN_EMAILS || '')

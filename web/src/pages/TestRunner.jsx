@@ -6,7 +6,7 @@ import { Rich } from '../components/Rich.jsx';
 import { AnswerInput, hasAnswer } from '../components/AnswerInput.jsx';
 import { ErrorBox, Pill, Spinner } from '../components/Layout.jsx';
 import { Icon } from '../components/Icon.jsx';
-import { useT } from '../lib/i18n.jsx';
+import { tk, useT } from '../lib/i18n.jsx';
 
 const SAVE_EVERY_MS = 20000;
 const backupKey = (id) => `jee_arena_attempt_${id}`;
@@ -46,6 +46,8 @@ export default function TestRunner() {
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveState, setSaveState] = useState('saved'); // saved | pending | saving | offline
+  // How sure the student is of each answer (sure / maybe / guess), for the "should I guess?" insight.
+  const [confidence, setConfidence] = useState({});
   const offset = useRef(0); // serverTime - clientTime
   const dirty = useRef(false);
   const latest = useRef({ answers: {}, marked: [], times: {} });
@@ -53,6 +55,10 @@ export default function TestRunner() {
   const times = useRef({});
   const timesDirty = useRef(false);
   const currentQid = useRef(null);
+  // The order the student moves through the paper, [[qid, startSec, seconds], ...] on the same visible-time
+  // clock as `times`, for the test strategy replay on the result page.
+  const visits = useRef([]);
+  const clock = useRef(0);
   const now = useNow(500);
 
   // ---- load / resume ----
@@ -77,6 +83,9 @@ export default function TestRunner() {
         const t = { ...(r.times || {}) };
         for (const [k, v] of Object.entries((useLocal && local.times) || {})) t[k] = Math.max(t[k] || 0, v);
         times.current = t;
+        clock.current = Object.values(t).reduce((a, b) => a + b, 0);
+        setConfidence({ ...(r.confidence || {}), ...((useLocal && local.confidence) || {}) });
+        visits.current = useLocal && (local.visits?.length || 0) >= (r.visits?.length || 0) ? local.visits || [] : r.visits || [];
         dirty.current = !!useLocal;
         setPaper(r);
       })
@@ -89,9 +98,9 @@ export default function TestRunner() {
   // ---- local backup on every change ----
   useEffect(() => {
     if (!paper) return;
-    latest.current = { answers, marked: [...marked], times: times.current };
-    writeBackup(id, { deadline: paper.deadline, answers, marked: [...marked], times: times.current });
-  }, [answers, marked, paper, id]);
+    latest.current = { answers, marked: [...marked], times: times.current, confidence, visits: visits.current };
+    writeBackup(id, { deadline: paper.deadline, ...latest.current });
+  }, [answers, marked, confidence, paper, id]);
 
   // ---- time per question: +1 s to the question on screen, while the tab is visible ----
   useEffect(() => {
@@ -100,8 +109,14 @@ export default function TestRunner() {
       const qid = currentQid.current;
       if (!qid || document.visibilityState !== 'visible') return;
       times.current[qid] = (times.current[qid] || 0) + 1;
+      const v = visits.current;
+      const last = v[v.length - 1];
+      if (last && last[0] === qid) last[2]++;
+      else if (v.length < 1500) v.push([qid, clock.current, 1]);
+      clock.current++;
       timesDirty.current = true;
       latest.current.times = times.current;
+      latest.current.visits = v;
       if (times.current[qid] % 10 === 0) writeBackup(id, { deadline: paper.deadline, ...latest.current });
     }, 1000);
     return () => clearInterval(tick);
@@ -172,7 +187,7 @@ export default function TestRunner() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      await api(`/tests/${id}/submit`, { method: 'POST', body: { answers: latest.current.answers, times: times.current } });
+      await api(`/tests/${id}/submit`, { method: 'POST', body: { answers: latest.current.answers, times: times.current, confidence: latest.current.confidence, visits: visits.current } });
       clearBackup(id);
       nav(`/test/${id}/result`, { replace: true });
     } catch (e) {
@@ -227,6 +242,16 @@ export default function TestRunner() {
       return next;
     });
   };
+  const setSure = (level) => {
+    dirty.current = true;
+    setSaveState('pending');
+    setConfidence((c) => {
+      const next = { ...c };
+      if (next[q.qid] === level) delete next[q.qid];
+      else next[q.qid] = level;
+      return next;
+    });
+  };
   const toggleMark = () => {
     dirty.current = true;
     setMarked((m) => {
@@ -272,6 +297,14 @@ export default function TestRunner() {
           <div style={{ marginTop: 20 }}>
             <AnswerInput question={q} value={answers[q.qid] ?? (q.type === 'multi' ? [] : '')} onChange={setAnswer} />
           </div>
+          {hasAnswer(q.type, answers[q.qid]) && (
+            <div className="sure-row" role="group" aria-label={t('How sure are you?')}>
+              <span className="muted small">{t('How sure are you?')}</span>
+              {[['sure', tk('Sure')], ['maybe', tk('50-50')], ['guess', tk('Guess')]].map(([k, label]) => (
+                <button key={k} type="button" className={`chip sm ${confidence[q.qid] === k ? 'on' : ''}`} aria-pressed={confidence[q.qid] === k} onClick={() => setSure(k)}>{t(label)}</button>
+              ))}
+            </div>
+          )}
           <div className="spread" style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
             <div className="row">
               <button className="btn" onClick={() => setAnswer(q.type === 'multi' ? [] : '')}>{t('Clear')}</button>

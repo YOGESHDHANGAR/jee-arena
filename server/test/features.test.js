@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { potdSubject } from '../src/lib/potd.js';
-import { plainText, questionMeta, injectMeta } from '../src/lib/seo.js';
+import { plainText, questionMeta, injectMeta, adsenseMeta } from '../src/lib/seo.js';
 import { signS3 } from '../../scripts/upload-media.js';
 
 test('problem of the day rotates subjects by day', () => {
@@ -47,4 +47,10 @@ test('S3 signature v4 matches the AWS reference implementation', () => {
     now: new Date('2026-09-29T12:34:56.000Z'),
   });
   assert.match(s.authorization, /^AWS4-HMAC-SHA256 Credential=AK\/20260929\/auto\/s3\/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date, Signature=66924fd2b4de8b06c9f445c02615abe58b9386cd6efdfced55f8675cdbbe1a9a$/);
+});
+
+test('adsense verification tag only for a real publisher ID', () => {
+  assert.equal(adsenseMeta(''), '');
+  assert.equal(adsenseMeta('ca-pub-123"><script>'), '');
+  assert.equal(adsenseMeta('ca-pub-1234567890123456'), '<meta name="google-adsense-account" content="ca-pub-1234567890123456" />');
 });

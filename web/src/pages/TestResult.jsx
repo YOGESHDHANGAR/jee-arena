@@ -7,10 +7,13 @@ import { AnswerInput } from '../components/AnswerInput.jsx';
 import { ErrorBox, Pill, Spinner } from '../components/Layout.jsx';
 import { ReportButton } from '../components/ReportButton.jsx';
 import { ShareResult } from '../components/ShareCard.jsx';
+import { ReasonPicker } from '../components/ReasonPicker.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { tk, useT } from '../lib/i18n.jsx';
 import { estimatePercentile, fmtPercentile, fmtRank, isFullJeeMain, SOURCE } from '../lib/percentile.js';
+
+const CONF_LABEL = { sure: tk('Sure'), maybe: tk('50-50'), guess: tk('Guess') };
 
 const STATUS = {
   correct: ['good', 'Correct'],
@@ -79,7 +82,7 @@ export default function TestResult() {
           <h1 style={{ margin: 0 }}>{r.test.title}</h1>
         </div>
         <div className="row">
-          {user && <Link className="btn ghost" to={`/u/${user.username}?tab=analysis`}><Icon.ChartColumn /> {t('My analysis')}</Link>}
+          {user && <Link className="btn ghost" to="/progress?tab=analysis"><Icon.ChartColumn /> {t('My analysis')}</Link>}
           {r.test.kind !== 'practice' && <ShareResult r={r} testPath={`/test/${r.test.slug || r.test.id}`} />}
           <Link className="btn" to={`/test/${id}`}>{r.test.kind === 'practice' ? t('Test details') : t('Leaderboard')}</Link>
         </div>
@@ -118,6 +121,7 @@ export default function TestResult() {
       )}
 
       {hasTimes && <TimeAnalysis r={r} />}
+      {r.replay && <Replay replay={r.replay} />}
 
       <div className="spread review-head">
         <h2 style={{ margin: 0, fontSize: '1.15rem' }}>{t('Review your answers')}</h2>
@@ -145,12 +149,14 @@ export default function TestResult() {
             setStep={setStep}
             saved={saved}
             toggleSave={toggleSave}
+            testId={r.test.id}
+            reasons={r.reasons}
           />
         ) : <div className="card empty">{t('Nothing here.')}</div>
       ) : (
         <div className="stack">
           {qs.map((q) => (
-            <QuestionReview key={q.qid} q={q} n={r.questions.indexOf(q) + 1} saved={saved.has(q.qid)} onSave={() => toggleSave(q.qid)} />
+            <QuestionReview key={q.qid} q={q} n={r.questions.indexOf(q) + 1} saved={saved.has(q.qid)} onSave={() => toggleSave(q.qid)} testId={r.test.id} reason={r.reasons?.[q.qid]} />
           ))}
           {!qs.length && <div className="card empty">{t('Nothing here.')}</div>}
         </div>
@@ -169,7 +175,7 @@ function benchmark(q) {
 }
 
 /** One question of the paper, reviewed: your answer vs the right one, time vs benchmark, solution, save. */
-function QuestionReview({ q, n, saved, onSave, open }) {
+function QuestionReview({ q, n, saved, onSave, open, testId, reason }) {
   const t = useT();
   const status = q.result?.status || 'unattempted';
   const [cls, label] = STATUS[status];
@@ -184,6 +190,7 @@ function QuestionReview({ q, n, saved, onSave, open }) {
         <Pill kind={q.subject}>{t(SUBJECT_LABEL[q.subject])}</Pill>
         <Pill>{q.chapterName || q.chapter}</Pill>
         <Pill>{t(TYPE_LABEL[q.type])}</Pill>
+        {q.result?.conf && <Pill>{t('You said: {level}', { level: t(CONF_LABEL[q.result.conf]) })}</Pill>}
         <span className="row" style={{ gap: 4, marginLeft: 'auto' }}>
           <ReportButton qid={q.qid} from="test" />
           <Link to={`/problems/${q.qid}`} className="small muted">#{q.qid}</Link>
@@ -213,6 +220,12 @@ function QuestionReview({ q, n, saved, onSave, open }) {
         </button>
       </div>
 
+      {status !== 'correct' && testId && (
+        <div style={{ marginTop: 12 }}>
+          <ReasonPicker key={q.qid} path={`/tests/${testId}/reasons`} qid={q.qid} value={reason} compact />
+        </div>
+      )}
+
       {q.solution && (
         <details style={{ marginTop: 14 }} open={open}>
           <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('Solution')}</summary>
@@ -224,7 +237,7 @@ function QuestionReview({ q, n, saved, onSave, open }) {
 }
 
 /** Step through the paper one question at a time, with a palette to jump around (← → keys work too). */
-function ReviewStepper({ qs, all, step, setStep, saved, toggleSave }) {
+function ReviewStepper({ qs, all, step, setStep, saved, toggleSave, testId, reasons }) {
   const t = useT();
   const q = qs[step];
   const n = all.indexOf(q) + 1;
@@ -254,7 +267,7 @@ function ReviewStepper({ qs, all, step, setStep, saved, toggleSave }) {
           </button>
         ))}
       </div>
-      <QuestionReview q={q} n={n} saved={saved.has(q.qid)} onSave={() => toggleSave(q.qid)} open />
+      <QuestionReview q={q} n={n} saved={saved.has(q.qid)} onSave={() => toggleSave(q.qid)} open testId={testId} reason={reasons?.[q.qid]} />
       <div className="spread review-nav">
         <button className="btn" disabled={step === 0} onClick={() => setStep(step - 1)}><Icon.ChevronLeft /> {t('Previous')}</button>
         <span className="muted small">{t('{a} of {b}', { a: step + 1, b: qs.length })}</span>
@@ -319,6 +332,90 @@ function TimeAnalysis({ r }) {
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+const STATUS_COLOR = { correct: 'var(--good)', partial: 'var(--warn)', wrong: 'var(--bad)', unattempted: 'var(--muted)' };
+const SUBJ_COLOR = { physics: 'var(--phy)', chemistry: 'var(--chem)', maths: 'var(--math)' };
+
+/**
+ * Test strategy replay (server/src/lib/insights.js testReplay): the order you moved through the paper,
+ * time sunk into questions that didn't pay, easy questions left behind, and where you got stuck.
+ */
+function Replay({ replay: x }) {
+  const t = useT();
+  const [hover, setHover] = useState(null);
+  const jump = (n) => document.getElementById(`q${n}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const tips = [];
+  if (x.wrongMinutes >= 5) tips.push(['error', t('{m} min went on answers that turned out wrong. If a question is still unclear after 3 minutes, mark it and move on.', { m: x.wrongMinutes })]);
+  if (x.easyLeft.length) tips.push(['warn', t('{n} easy questions were left blank. Do a quick first pass for the easy ones before the hard ones.', { n: x.easyLeft.length })]);
+  if (x.neverSeen > 0) tips.push(['warn', x.neverSeen === 1 ? t('1 question you never opened. Every question deserves a 20-second look.') : t('{n} questions you never opened. Every question deserves a 20-second look.', { n: x.neverSeen })]);
+  if (x.hasOrder && x.quarters[3] > x.quarters[0] && x.quarters[3] >= 5) tips.push(['warn', t('You opened more questions in the last quarter than the first: a slow start meant a rush at the end.')]);
+  const total = x.duration;
+  const h = hover !== null ? x.timeline?.[hover] : null;
+  return (
+    <div className="card replay" style={{ marginBottom: 16 }}>
+      <h3 className="with-icon"><Icon.Route /> {t('How you took this test')}</h3>
+      <div className="grid grid-4" style={{ marginBottom: 12 }}>
+        <div className="stat"><b>{x.wrongMinutes} {t('min')}</b><span>{t('on {n} wrong answers', { n: x.wrongCount })}</span></div>
+        <div className="stat"><b>{x.blankSeenMinutes} {t('min')}</b><span>{t('on {n} questions you then left blank', { n: x.blankSeenCount })}</span></div>
+        <div className="stat"><b>{x.easyLeft.length}</b><span>{t('easy questions left blank')}</span></div>
+        <div className="stat"><b>{x.hasOrder ? x.revisited : '—'}</b><span>{t('questions you came back to')}</span></div>
+      </div>
+
+      {x.hasOrder && x.subjectOrder.length > 0 && (
+        <p className="small" style={{ margin: '0 0 10px' }}>
+          {t('Your order:')} <b>{x.subjectOrder.map((s) => t(SUBJECT_LABEL[s])).join(' → ')}</b>
+        </p>
+      )}
+
+      {x.timeline && x.timeline.length > 0 && (
+        <div className="replay-strip-wrap">
+          <svg className="replay-strip" viewBox="0 0 1000 36" preserveAspectRatio="none" role="img" aria-label={t('Timeline of the test: each block is time on one question, coloured by result')} onMouseLeave={() => setHover(null)}>
+            {x.timeline.map((v, i) => (
+              <rect key={i} x={(1000 * v.start) / total} width={Math.max(1.5, (1000 * v.secs) / total)} y={v.status === 'correct' ? 4 : 0} height={v.status === 'correct' ? 28 : 36}
+                fill={STATUS_COLOR[v.status]} opacity={hover === null || hover === i ? 1 : 0.35} onMouseEnter={() => setHover(i)} onClick={() => jump(v.n)} style={{ cursor: 'pointer' }} />
+            ))}
+          </svg>
+          <div className="spread small muted"><span>0:00</span><span>{h ? `Q${h.n} · ${t(SUBJECT_LABEL[h.subject])} · ${fmtShort(h.secs)} · ${t(STATUS[h.status][1])}` : t('Hover a block to see the question; click to jump to it.')}</span><span>{fmtShort(total)}</span></div>
+          <div className="legend small" style={{ marginTop: 6 }}>
+            {['correct', 'wrong', 'unattempted'].map((k) => <span key={k}><i style={{ background: STATUS_COLOR[k], borderColor: STATUS_COLOR[k] }} />{t(STATUS[k][1])}</span>)}
+          </div>
+        </div>
+      )}
+
+      {x.hasOrder && (
+        <div style={{ marginTop: 12 }}>
+          <div className="small muted" style={{ marginBottom: 4 }}>{t('New questions opened in each quarter of the time')}</div>
+          <div className="quarters">
+            {x.quarters.map((n, i) => (
+              <div key={i} className="quarter">
+                <div className="bar" style={{ height: 8 }}><i style={{ width: `${(100 * n) / Math.max(1, ...x.quarters)}%` }} /></div>
+                <span className="small mono">{i + 1}/4: {n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {x.stuck.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div className="small muted" style={{ marginBottom: 4 }}>{t('Where you got stuck (over 4 minutes, not solved)')}</div>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+            {x.stuck.map((q) => (
+              <button key={q.n} className="chip sm" onClick={() => jump(q.n)} style={{ borderColor: SUBJ_COLOR[q.subject] }}>Q{q.n} · {fmtShort(q.secs)}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tips.length > 0 && (
+        <div className="stack" style={{ gap: 6, marginTop: 12 }}>
+          {tips.map(([kind, text]) => <div key={text} className={`alert ${kind} small`}>{text}</div>)}
+        </div>
+      )}
+      {!x.hasOrder && <p className="muted small" style={{ margin: '10px 0 0' }}>{t('The order you moved through the paper is recorded on tests taken from now on.')}</p>}
     </div>
   );
 }

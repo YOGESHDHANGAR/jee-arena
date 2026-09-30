@@ -4,6 +4,7 @@ import { col } from '../db.js';
 import { publicUser, requireUser } from '../auth.js';
 import { ah, bad, forbidden, notFound, dayKey } from '../lib/util.js';
 import { cachedAnalysis, freeView, weakChapters } from '../lib/analysis.js';
+import { cachedInsights, forgetInsights, freeInsights } from '../lib/insights.js';
 import { dueCount } from '../lib/reviews.js';
 import { syllabusChapter } from '../lib/syllabus.js';
 
@@ -71,7 +72,16 @@ usersRouter.patch(
       set.name = name;
     }
     if (req.body.targetYear !== undefined) set.targetYear = Number(req.body.targetYear) || null;
+    if (req.body.examDate !== undefined) {
+      const d = String(req.body.examDate || '');
+      const ok = /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d));
+      if (d && !ok) throw bad('Pick a valid exam date');
+      set.examDate = ok ? d : null;
+    }
+    if (req.body.homeState !== undefined) set.homeState = String(req.body.homeState || '').slice(0, 40) || null;
+    if (req.body.femaleSeats !== undefined) set.femaleSeats = !!req.body.femaleSeats;
     await col('users').updateOne({ _id: new ObjectId(req.user.id) }, { $set: set });
+    forgetInsights(req.user.id);
     const u = await col('users').findOne({ _id: new ObjectId(req.user.id) });
     res.json(publicUser(u));
   }),
@@ -92,6 +102,23 @@ usersRouter.get(
     // The full analysis is Pro; admins always see everything (e.g. to help a student).
     const full = u.plan === 'pro' || req.user.role === 'admin';
     res.json(full ? { ...data, pro: true } : freeView(data));
+  }),
+);
+
+/**
+ * "My journey" insights (lib/insights.js): why marks were lost, guessing, predicted score and colleges,
+ * what to study next, syllabus pace, test strategy, retention, effort. Private like the analysis.
+ */
+usersRouter.get(
+  '/:username/insights',
+  requireUser,
+  ah(async (req, res) => {
+    const u = await col('users').findOne({ username: String(req.params.username).toLowerCase() }, { projection: { _id: 1, plan: 1 } });
+    if (!u) throw notFound('User not found');
+    if (String(u._id) !== req.user.id && req.user.role !== 'admin') throw forbidden('Only you can see your insights');
+    const data = await cachedInsights(u._id);
+    const full = u.plan === 'pro' || req.user.role === 'admin';
+    res.json(full ? { ...data, pro: true } : freeInsights(data));
   }),
 );
 
