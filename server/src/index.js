@@ -19,11 +19,13 @@ import { reviewsRouter } from './routes/reviews.js';
 import { robots, serveIndex, sitemapIndex, sitemapPages, sitemapProblems } from './lib/seo.js';
 import { ah, dayKey } from './lib/util.js';
 import { ignorable, recordError } from './lib/errors.js';
+import { startUsageClock, trackTraffic } from './lib/usage.js';
 import rateLimit from 'express-rate-limit';
 
 export function createApp() {
   const app = express();
   app.set('trust proxy', 1);
+  app.use(trackTraffic); // Admin → Usage & cost: requests and bandwidth (lib/usage.js)
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(compression());
   app.use(cors({ origin: config.corsOrigin.split(',') }));
@@ -132,5 +134,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     setTimeout(() => process.exit(1), 2000).unref();
   });
   await connect();
+  startUsageClock(); // counts awake minutes for Render's free instance hours
   createApp().listen(config.port, () => console.log(`JEE Arena API on http://localhost:${config.port}`));
 }

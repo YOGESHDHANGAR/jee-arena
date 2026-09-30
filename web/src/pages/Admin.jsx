@@ -22,6 +22,7 @@ export default function Admin() {
       <div className="tabs">
         <NavLink end to="/admin" className={({ isActive }) => `tab ${isActive ? 'on' : ''}`} style={{ textDecoration: 'none' }}>Overview</NavLink>
         <NavLink to="/admin/growth" className={({ isActive }) => `tab ${isActive ? 'on' : ''}`} style={{ textDecoration: 'none' }}>Growth</NavLink>
+        <NavLink to="/admin/usage" className={({ isActive }) => `tab ${isActive ? 'on' : ''}`} style={{ textDecoration: 'none' }}>Usage &amp; cost</NavLink>
         <NavLink to="/admin/questions" className={({ isActive }) => `tab ${isActive ? 'on' : ''}`} style={{ textDecoration: 'none' }}>Questions</NavLink>
         <NavLink to="/admin/reports" className={({ isActive }) => `tab ${isActive ? 'on' : ''}`} style={{ textDecoration: 'none' }}>Reports</NavLink>
         <NavLink to="/admin/solutions" className={({ isActive }) => `tab ${isActive ? 'on' : ''}`} style={{ textDecoration: 'none' }}>Solutions</NavLink>
@@ -34,6 +35,7 @@ export default function Admin() {
       <Routes>
         <Route index element={<Overview />} />
         <Route path="growth" element={<Growth />} />
+        <Route path="usage" element={<Usage />} />
         <Route path="questions" element={<Questions />} />
         <Route path="reports" element={<Reports />} />
         <Route path="duplicates" element={<Duplicates />} />
@@ -438,6 +440,169 @@ function Growth() {
           ) : <div className="empty">Nobody yet. Every share card link carries the sharer's username, so sign-ups from it are credited here.</div>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Free-tier usage, this month's bill and cost per student, refreshed live (server/src/lib/usage.js). */
+const fmtBytes = (b) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(2)} GB` : b >= 1024 ** 2 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+const usd = (v) => `$${v < 1 && v > 0 ? v.toFixed(v < 0.01 ? 4 : 2) : v.toFixed(2)}`;
+const PLAN_LABEL = { free: 'Free', starter: 'Starter ($7/mo)', standard: 'Standard ($25/mo)', flex: 'Flex', m10: 'M10 dedicated' };
+
+function Meter({ label, used, limit, pct, note }) {
+  const color = pct >= 100 ? 'var(--bad)' : pct >= 80 ? 'var(--warn)' : 'var(--good)';
+  return (
+    <div className="card stack" style={{ gap: 8 }}>
+      <div className="spread"><h3 style={{ margin: 0 }}>{label}</h3><b className="mono" style={{ color }}>{pct}%</b></div>
+      <div className="bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
+        <i style={{ width: `${Math.min(100, pct)}%`, background: color }} />
+      </div>
+      <div className="spread small"><span className="mono">{used}</span><span className="muted">of {limit} free</span></div>
+      {note && <p className="muted small" style={{ margin: 0 }}>{note}</p>}
+    </div>
+  );
+}
+
+function Usage() {
+  const { data, error, loading, reload } = useApi('/admin/usage');
+  const [live, setLive] = useState(true);
+  useEffect(() => {
+    if (!live) return undefined;
+    const id = setInterval(() => { if (document.visibilityState === 'visible') reload(); }, 15000);
+    return () => clearInterval(id);
+  }, [live, reload]);
+  if (error && !data) return <ErrorBox error={error} />;
+  if (loading && !data) return <Spinner />;
+  const { database: db, server: sv, live: now, cost, plans, warnings } = data;
+  const inr = (v) => `₹${(v * plans.usdToInr).toLocaleString('en-IN', { maximumFractionDigits: v * plans.usdToInr < 10 ? 2 : 0 })}`;
+  const money = (v) => <>{usd(v)} <span className="muted small">≈ {inr(v)}</span></>;
+  return (
+    <div className="stack">
+      <div className="spread">
+        <div className="chips">
+          <button className={`chip ${live ? 'on' : ''}`} onClick={() => setLive((l) => !l)}>{live ? 'Live · every 15 s' : 'Paused'}</button>
+          <button className="chip" onClick={reload}>Refresh now</button>
+        </div>
+        <span className="muted small">
+          {live && <Pill kind="live">Live</Pill>} Updated {new Date(data.generatedAt).toLocaleTimeString('en-IN')} · {data.monthProgressPct}% through {data.month} (billing month, UTC)
+        </span>
+      </div>
+
+      {warnings.length > 0 && (
+        <div className="stack" style={{ gap: 6 }}>
+          {warnings.map((w) => <div key={w.text} className={`alert ${w.level === 'bad' ? 'error' : 'warn'}`}>{w.text}</div>)}
+        </div>
+      )}
+
+      <div className="grid grid-4">
+        <div className="card stat"><b>{money(cost.soFar.total)}</b><span>spent this month so far</span></div>
+        <div className="card stat"><b>{money(cost.projected.total)}</b><span>projected bill for {data.month}</span></div>
+        <div className="card stat"><b>{money(cost.perActiveUser)}</b><span>per active student / month ({cost.activeMonth} active in 30 days)</span></div>
+        <div className="card stat"><b>{money(cost.perUser)}</b><span>per registered student / month ({cost.users} in total)</span></div>
+      </div>
+
+      <h3 style={{ marginBottom: 0 }}>Free tiers</h3>
+      <div className="grid grid-3">
+        <Meter
+          label={`Database · Atlas ${PLAN_LABEL[plans.atlas]}`}
+          used={fmtBytes(db.usedBytes)}
+          limit={fmtBytes(db.limitBytes)}
+          pct={db.usedPct}
+          note={db.daysUntilFull !== null
+            ? `Growing ~${fmtBytes(db.growthPerDayBytes)}/day → full in about ${db.daysUntilFull} days.`
+            : 'Growth per day shows up after a second day of measurements.'}
+        />
+        <Meter
+          label={`Server hours · Render ${PLAN_LABEL[plans.render]}`}
+          used={`${sv.awakeHours} h`}
+          limit={`${sv.freeHours} h`}
+          pct={sv.hoursUsedPct}
+          note={plans.render === 'free'
+            ? `Projected ${sv.hoursProjected} h this month. The server sleeps after 15 min idle, which saves hours. The 750 free hours are shared by every free service in your Render workspace${plans.otherRenderHours ? ` (${plans.otherRenderHours} h set aside for the others)` : ''}.`
+            : 'Paid instance: hours are unlimited.'}
+        />
+        <Meter
+          label="Bandwidth · Render"
+          used={fmtBytes(sv.bandwidthGb * 1024 ** 3)}
+          limit={`${sv.bandwidthIncludedGb} GB`}
+          pct={sv.bandwidthUsedPct}
+          note={`Projected ${sv.bandwidthProjectedGb.toFixed(2)} GB this month. Beyond ${sv.bandwidthIncludedGb} GB costs $${data.prices.render.bandwidthPerGb}/GB. ${sv.requests.toLocaleString('en-IN')} requests so far.`}
+        />
+      </div>
+
+      <h3 style={{ marginBottom: 0 }}>Right now</h3>
+      <div className="grid grid-4">
+        <div className="card stat"><b>{now.requests5m.toLocaleString('en-IN')}</b><span>requests in the last 5 min</span></div>
+        <div className="card stat"><b>{now.kbPerMin5m} KB</b><span>sent per minute (last 5 min)</span></div>
+        <div className="card stat" style={{ borderColor: now.memoryPct >= 85 ? 'var(--bad)' : undefined }}>
+          <b>{now.memoryMb} MB</b><span>server memory ({now.memoryPct}% of {now.memoryLimitMb} MB)</span>
+        </div>
+        <div className="card stat"><b>{now.upSinceMinutes < 60 ? `${now.upSinceMinutes} min` : `${Math.floor(now.upSinceMinutes / 60)} h ${now.upSinceMinutes % 60} min`}</b><span>awake since last start</span></div>
+      </div>
+
+      <div className="grid grid-2">
+        <div className="card flush table-wrap">
+          <div style={{ padding: '14px 14px 0' }}><h3>This month's bill</h3></div>
+          <table className="table">
+            <thead><tr><th>Item</th><th>So far</th><th>Projected</th></tr></thead>
+            <tbody>
+              <tr><td>Render server ({PLAN_LABEL[plans.render]})</td><td className="mono">{usd(cost.soFar.render)}</td><td className="mono">{usd(cost.projected.render)}</td></tr>
+              <tr><td>Render extra bandwidth</td><td className="mono">{usd(cost.soFar.bandwidth)}</td><td className="mono">{usd(cost.projected.bandwidth)}</td></tr>
+              <tr><td>MongoDB Atlas ({PLAN_LABEL[plans.atlas]})</td><td className="mono">{usd(cost.soFar.atlas)}</td><td className="mono">{usd(cost.projected.atlas)}</td></tr>
+              <tr><td><b>Total</b></td><td className="mono"><b>{usd(cost.soFar.total)}</b></td><td className="mono"><b>{usd(cost.projected.total)}</b> <span className="muted small">≈ {inr(cost.projected.total)}</span></td></tr>
+            </tbody>
+          </table>
+          <p className="muted small" style={{ padding: '0 14px 12px', margin: 0 }}>
+            List prices, converted at ₹{plans.usdToInr}/$. Set PLAN_RENDER / PLAN_ATLAS on Render when you upgrade so this stays right.
+          </p>
+        </div>
+        <div className="card flush table-wrap">
+          <div style={{ padding: '14px 14px 0' }}><h3>If you upgrade</h3></div>
+          <table className="table">
+            <thead><tr><th>Setup</th><th>Per month</th><th>Per active student</th></tr></thead>
+            <tbody>
+              {cost.scenarios.map((s) => (
+                <tr key={s.name}>
+                  <td><b style={{ fontWeight: 600 }}>{s.name}</b> <span className="muted small">Render {PLAN_LABEL[s.render]} · Atlas {PLAN_LABEL[s.atlas]}</span></td>
+                  <td className="mono">{usd(s.monthly)} <span className="muted small">≈ {inr(s.monthly)}</span></td>
+                  <td className="mono">{cost.activeMonth ? inr(s.perActiveUser) : '–'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {sv.daily.length > 1 && (
+        <div className="grid grid-3">
+          <BarChart title="Requests per day" data={sv.daily} valueKey="requests" />
+          <BarChart title="Data sent per day" data={sv.daily} valueKey="mb" fmt={(v) => `${Math.round(v).toLocaleString('en-IN')} MB`} />
+          <BarChart title="Server hours per day" data={sv.daily} valueKey="hours" fmt={(v) => `${v.toFixed(1)} h`} />
+        </div>
+      )}
+
+      {db.collections.length > 0 && (
+        <div className="card flush table-wrap">
+          <div style={{ padding: '14px 14px 0' }}><h3>What takes up the database</h3></div>
+          <table className="table">
+            <thead><tr><th>Collection</th><th>Documents</th><th>Size (with indexes)</th><th>Share</th></tr></thead>
+            <tbody>
+              {db.collections.filter((c) => c.bytes > 0).map((c) => (
+                <tr key={c.name}>
+                  <td className="mono">{c.name}</td>
+                  <td className="mono">{c.docs.toLocaleString('en-IN')}</td>
+                  <td className="mono">{fmtBytes(c.bytes)}</td>
+                  <td style={{ width: '30%' }}><div className="bar"><i style={{ width: `${Math.max(1, (100 * c.bytes) / db.usedBytes)}%` }} /></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="muted small">
+        Server hours and bandwidth are counted by the app itself from when this tab was added, so the first month under-counts.
+        Render's dashboard (Billing → Usage) has the exact figures.
+      </p>
     </div>
   );
 }

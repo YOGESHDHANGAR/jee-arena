@@ -14,6 +14,7 @@ import { clearChapterCache } from '../lib/chapters.js';
 import { previewOf } from '../lib/util.js';
 import { calibrateDifficulty } from '../lib/difficulty.js';
 import { growthReport } from '../lib/growth.js';
+import { usageReport } from '../lib/usage.js';
 import { autoMerge, clearDuplicateCache, describeGroups, duplicateGroups, mergeGroup, scanFingerprints, scanStatus } from '../lib/duplicates.js';
 
 export const adminRouter = Router();
@@ -229,6 +230,15 @@ adminRouter.patch(
       { $set: { status, closedAt: status === 'open' ? null : new Date(), closedBy: new ObjectId(req.user.id) } },
     );
     res.json({ updated: r.modifiedCount });
+  }),
+);
+
+// Free-tier usage, this month's bill and cost per student (lib/usage.js).
+adminRouter.get(
+  '/usage',
+  ah(async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(await usageReport());
   }),
 );
 
