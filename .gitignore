@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.log
+.claude-tmp/
+backups/
+_deploy/
+_deploy_bundle.tgz

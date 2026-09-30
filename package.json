@@ -1,0 +1,34 @@
+{
+  "name": "jee-arena",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "LeetCode-style practice, contests and rankings for JEE students",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web",
+    "start": "npm run start -w server",
+    "test": "npm test -w server",
+    "seed": "node --env-file-if-exists=.env scripts/seed.js",
+    "import": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/import-from-bank.js",
+    "premium": "node --env-file-if-exists=.env scripts/premium.js",
+    "make-admin": "node --env-file-if-exists=.env scripts/make-admin.js",
+    "copy-db": "node --env-file-if-exists=.env scripts/copy-db.js",
+    "media:upload": "node --env-file-if-exists=.env scripts/upload-media.js",
+    "duplicates": "node --env-file-if-exists=.env scripts/find-duplicates.js",
+    "calibrate": "node --env-file-if-exists=.env scripts/calibrate-difficulty.js",
+    "chapters:classify": "node --env-file-if-exists=.env scripts/classify-chapters.js",
+    "backup": "node --env-file-if-exists=.env scripts/backup.js",
+    "restore": "node --env-file-if-exists=.env scripts/restore.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

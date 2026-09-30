@@ -1,0 +1,22 @@
+# Render Blueprint: one Node web service (API + built web app). Database is MongoDB Atlas.
+services:
+  - type: web
+    name: jee-arena
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DB_NAME
+        value: jee_arena
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAILS
+        sync: false

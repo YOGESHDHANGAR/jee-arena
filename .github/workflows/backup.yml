@@ -1,0 +1,44 @@
+# Weekly database backup (MongoDB Atlas free tier has none).
+#
+# Setup, once: GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
+#   MONGO_URI   your Atlas connection string        (required)
+#   DB_NAME     jee_arena                            (optional, defaults to jee_arena)
+#   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET   (optional: also copy to Cloudflare R2)
+# In Atlas → Network Access, allow 0.0.0.0/0 (GitHub's runners have no fixed IP) — the password still protects it.
+#
+# Each run's file is also kept as a downloadable artifact for 30 days (Actions → the run → Artifacts).
+# Run it by hand any time: Actions → "Database backup" → Run workflow.
+name: Database backup
+
+on:
+  schedule:
+    - cron: '30 21 * * 0' # every Sunday 21:30 UTC = Monday 03:00 IST
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev
+      - name: Back up
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          DB_NAME: ${{ secrets.DB_NAME || 'jee_arena' }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          if [ -n "$R2_BUCKET" ]; then node scripts/backup.js --out=backups --upload; else node scripts/backup.js --out=backups; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_number }}
+          path: backups/*.jsonl.gz
+          retention-days: 30
+          compression-level: 0 # already gzip'd
